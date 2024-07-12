@@ -75,6 +75,26 @@ impl ReleaseRadar {
         return rr_track_album_ids;
     }
 
+    pub async fn query_rr(&self, rr_type: bool) {
+        let pl_id = self.get_rr_id(rr_type);
+        let playlist = self
+            .client
+            .playlist(pl_id.clone(), None, Some(self.market))
+            .await
+            .unwrap();
+        let tracks = playlist.tracks.items;
+        for track in tracks {
+            match track.track {
+                Some(PlayableItem::Track(ref track)) => {
+                    println!("Track: {:?}", track.name);
+                    println!("Album: {:?}", track.album.name);
+                    println!("Artists: {:?}", track.artists);
+                    print_separator();
+                }
+                _ => (),
+            }
+        }
+    }
     // pub async fn get_album_tracks_from_rr(&self, print: bool) -> HashSet<TrackId> {
     pub async fn get_album_tracks_from_rr(&self, print: bool) -> Vec<TrackId> {
         let album_ids = self.get_rr_track_album_ids().await;
@@ -168,6 +188,26 @@ impl ReleaseRadar {
                     .expect("Track IDs should be assigned to chunk_iterated as type TrackID");
             }
         }
+    }
+    
+    fn print_all_album_track_ids(album_track_ids: &Vec<Vec<TrackId>>) {
+        album_track_ids
+            .iter()
+            .enumerate()
+            .for_each(|(outer_index, album)| {
+                album
+                    .iter()
+                    .enumerate()
+                    .for_each(|(inner_index, track_id)| {
+                        println!(
+                            "Album {:?} - Track {:?}:\t{:?}",
+                            outer_index + 1,
+                            inner_index + 1,
+                            track_id
+                        );
+                    });
+                print_separator();
+            });
     }
 }
 
