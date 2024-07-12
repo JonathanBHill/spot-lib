@@ -1,7 +1,11 @@
 use term_size;
-pub fn print_type_of<T>(_: &T) -> &'static str {
-    // #[cfg(test)]
-    // println!("{}", std::any::type_name::<T>());
+pub fn get_type<T>(_: &T, short: bool) -> &'static str {
+    let full_type = std::any::type_name::<T>();
+    if short {
+        let split: Vec<&str> = full_type.split("::").collect();
+        return split.last().unwrap();
+    }
+    
     return std::any::type_name::<T>();
 }
 pub fn print_separator() {

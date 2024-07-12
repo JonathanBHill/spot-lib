@@ -1,6 +1,6 @@
-use std::collections::HashSet;
 use rspotify::model::Market;
 use rspotify::scopes;
+use std::collections::HashSet;
 
 pub trait Printables {
     fn properties(&self);

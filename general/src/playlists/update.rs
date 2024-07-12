@@ -1,14 +1,15 @@
-use std::borrow::Cow;
-use std::env;
 use dotenv::dotenv;
 use futures_util::{SinkExt, TryStreamExt};
 use rspotify::clients::{BaseClient, OAuthClient};
 use rspotify::model::Country::UnitedStates;
 use rspotify::model::{AlbumId, Market, PlayableItem, PlaylistId, TrackId};
 use rspotify::{prelude::*, scopes, AuthCodeSpotify};
+use std::borrow::Cow;
+use std::env;
 
 use crate::traits::utilities::Defaults;
 use crate::utils::client::setup;
+use crate::utils::misc::print_separator;
 
 pub struct ReleaseRadar {
     pub client: AuthCodeSpotify,
@@ -29,15 +30,17 @@ impl ReleaseRadar {
 
         ReleaseRadar {
             client: setup(Some(scopes)).await,
-            release_radar_id: PlaylistId::from_id(Cow::from(
-                env::var("RELEASE_RADAR_ID").unwrap())).unwrap(),
+            release_radar_id: PlaylistId::from_id(Cow::from(env::var("RELEASE_RADAR_ID").unwrap()))
+                .unwrap(),
             my_release_radar_id: PlaylistId::from_id(Cow::from(
-                env::var("MY_RELEASE_RADAR_ID").unwrap())).unwrap(),
+                env::var("MY_RELEASE_RADAR_ID").unwrap(),
+            ))
+            .unwrap(),
             market: <ReleaseRadar as Defaults>::market(),
         }
     }
-    fn get_rr_id(&self, full: bool) -> PlaylistId {
-        let playlist_id = match full {
+    fn get_rr_id(&self, rr_type: bool) -> PlaylistId {
+        let playlist_id = match rr_type {
             true => match PlaylistId::from_id(self.my_release_radar_id.id()) {
                 Ok(id) => id,
                 Err(e) => panic!("Error: {:?}", e),
@@ -110,10 +113,6 @@ impl ReleaseRadar {
         if print {
             Self::print_all_album_track_ids(&album_track_ids);
         };
-        // if playable {
-        //     return_vector.iter().map(|id| PlayableId::Track(id.clone())).collect::<Vec<PlayableId>>().into_iter()
-        // }
-
         return return_vector;
     }
 
@@ -128,32 +127,45 @@ impl ReleaseRadar {
         return extended;
     }
 
-    
-    pub async fn update_rr(&self) {
+    pub async fn update_rr(&self, print: bool) {
         let ids = self.get_album_tracks_from_rr(false).await;
         let pl_id = PlaylistId::from_id(self.my_release_radar_id.id().clone()).unwrap();
         let chunks = ids.chunks(20);
         let mut replace = true;
         for chunk in chunks {
-            let chunk_iterated = chunk.into_iter().map(|track| track.id().clone().to_string()).collect::<Vec<String>>();
-            
+            let chunk_iterated = chunk
+                .into_iter()
+                .map(|track| track.id().clone().to_string())
+                .collect::<Vec<String>>();
+
             if replace {
-                println!("Replacing playlist with the first {:?} tracks", chunk.len());
-                self.client.playlist_replace_items(
-                    pl_id.clone(),
-                    chunk_iterated.into_iter().map(
-                        |track_id| PlayableId::Track(TrackId::from_id(track_id).unwrap())
-                    )).await.expect("TODO: panic message");
+                if print {
+                    println!("Replacing playlist with the first {:?} tracks", chunk.len());
+                }
+                self.client
+                    .playlist_replace_items(
+                        pl_id.clone(),
+                        chunk_iterated
+                            .into_iter()
+                            .map(|track_id| PlayableId::Track(TrackId::from_id(track_id).unwrap())),
+                    )
+                    .await
+                    .expect("Track IDs should be assigned to chunk_iterated as type TrackID");
                 replace = false;
             } else {
-                println!("Adding {:?} tracks to the playlist", chunk.len());
-                self.client.playlist_add_items(
-                    pl_id.clone(),
-                    chunk_iterated.into_iter().map(
-                        |track_id| PlayableId::Track(TrackId::from_id(track_id).unwrap())
-                    ),
-                    Option::None
-                ).await.expect("TODO: panic message");
+                if print {
+                    println!("Adding {:?} tracks to the playlist", chunk.len());
+                }
+                self.client
+                    .playlist_add_items(
+                        pl_id.clone(),
+                        chunk_iterated
+                            .into_iter()
+                            .map(|track_id| PlayableId::Track(TrackId::from_id(track_id).unwrap())),
+                        Option::None,
+                    )
+                    .await
+                    .expect("Track IDs should be assigned to chunk_iterated as type TrackID");
             }
         }
     }
@@ -163,7 +175,7 @@ impl ReleaseRadar {
 #[cfg_attr(debug_assertions, allow(unused_variables, dead_code))]
 mod tests {
     use super::*;
-    use crate::utils::misc::print_type_of;
+    use crate::utils::misc::get_type;
     use rspotify::model::Market;
 
     #[tokio::test]
@@ -178,8 +190,8 @@ mod tests {
         );
         assert_eq!(rr.client.get_oauth().scopes, playlist_scopes);
         assert_eq!(
-            print_type_of(&rr.market),
-            print_type_of(&Market::Country(UnitedStates))
+            get_type(&rr.market, true),
+            get_type(&Market::Country(UnitedStates), true)
         );
         println!("ReleaseRadar was successfully instantiated with the correct market country and correct scopes.");
     }
@@ -214,5 +226,4 @@ mod tests {
         assert_eq!(rr_id.id(), env::var("MY_RELEASE_RADAR_ID").unwrap());
         println!("ReleaseRadar successfully retrieved the correct Release Radar ID.");
     }
-
 }

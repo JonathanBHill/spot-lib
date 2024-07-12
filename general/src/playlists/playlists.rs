@@ -1,9 +1,4 @@
-use std::env;
-use rspotify::model::{FullPlaylist, Market, PlayableItem, PlaylistId, TrackId};
-use rspotify::model::Country::UnitedStates;
-use crate::models::playlists::StoredPlaylist;
-use crate::playlists::update::ReleaseRadar;
-use crate::utils::misc::print_separator;
+use rspotify::model::FullPlaylist;
 
 pub enum Playlist {
     ReleaseRadar(FullPlaylist),
@@ -20,7 +15,7 @@ impl PlaylistActions for Playlist {
     // fn replace_tracks(&self, track_ids: Vec<TrackId>) {
     //     todo!()
     // }
-    
+
     // fn get_playlist_tracks(&self) {
     //     match self { Playlist::ReleaseRadar(playlist) => {playlist.clone().tracks.items} }
     //     todo!()
@@ -38,7 +33,7 @@ trait PlaylistActions {
     // fn get_playlist_tracks_properties(&self);
     // fn get_playlist_tracks_audio_features(&self);
     // fn get_playlist_tracks_audio_analysis(&self);
-    
+
     // fn get_playlist(&self);
     // fn delete_playlist(&self);
     // fn create_playlist(&self);
