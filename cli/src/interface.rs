@@ -1,12 +1,14 @@
 use std::cmp::PartialEq;
 use std::collections::HashMap;
-use std::fmt::Display;
 
 use clap::{Arg, arg, ArgAction, ArgGroup, ArgMatches, ColorChoice, Command, value_parser, ValueEnum};
 use clap::builder::{BoolValueParser, styling, TypedValueParser};
 use clap_complete::{generate, Shell};
 #[allow(unused_imports)]
 use dialoguer::MultiSelect;
+use futures::stream::{self, StreamExt};
+use spot_lib_general::playlists::playlists::ComparePlaylists;
+use spot_lib_general::playlists::query::PlaylistQuery;
 
 use spot_lib_general::playlists::update::ReleaseRadar;
 
@@ -28,6 +30,7 @@ macro_rules! generate_auto_complete {
         }
     };
 }
+#[allow(unused_macros)]
 macro_rules! handle_rr {
     ($matches:expr, $key:expr, $type:ty, $variant:ident) => {{
         let presence = match $matches.get_one::<$type>($key) {
@@ -87,159 +90,38 @@ impl TerminalApp {
 
         TerminalApp { command: app_cmd }
     }
+    
     pub async fn run(&self) {
         let matches = self.command.clone().get_matches();
+        let subcommands_stream = stream::iter(self.command.get_subcommands());
         self.check_subcommand_conflicts(&matches);
         
-        if let Some(matches) = matches.subcommand_matches("config") {
-            if let Some(shell) = matches.get_one::<ShellType>("cshell") {
-                let mut cmd = self.command.clone();
-                generate_auto_complete!(shell, cmd);
-                return;
-            }
-        }
-        if let Some(rrc_cmds) = matches.clone().subcommand_matches("releaseradar") {
-            if let Some(list) = rrc_cmds.subcommand_matches("queryrr") {
-                let rl_spot = list.get_one::<bool>("rlspot").unwrap_or(&false).to_string();
-                let rl_custom = list.get_one::<bool>("rlcustom").unwrap_or(&false).to_string();
-                println!("Spotify flag: {:?}; Custom flag: {:?}", &rl_spot, &rl_custom);
-                if rl_spot == "true" {
-                    let rr = ReleaseRadar::new().await;
-                    rr.query_rr(false).await;
-                } else if rl_custom == "true" {
-                    let rr = ReleaseRadar::new().await;
-                    rr.query_rr(true).await;
-                }
-            }
-            if let Some(update) = rrc_cmds.subcommand_matches("rrupdate") {
-                let print_rr = update.get_one::<bool>("printrr").unwrap_or(&false).to_string();
-                let rr = ReleaseRadar::new().await;
-                if print_rr == "true" {
-                    rr.update_rr(true).await;
-                    // println!("Printing the update progress");
-                } else {
-                    rr.update_rr(false).await;
-                    println!("Your personal Release Radar has been updated.");
-                }
-            }
-        };
-        
-        self.command.get_subcommands().for_each(|cmd| {
+        subcommands_stream.for_each(|cmd| async {
             let name = cmd.get_name();
             match matches.subcommand_matches(name) {
-                None => {}
-                Some(sub_cmd) => {}
-            }
-            if let Some(subcommand) = matches.subcommand_matches(name) {
-                match name {
-                    "playlist" => {
-                        self.scan_playlist_command(&subcommand);
-                    }
-                    "config" => {
-                        self.scan_config_command(&subcommand);
-                    }
-                    _ => {}
+                None => {
+                    println!("No matches for subcommand, {:?}", &name);
                 }
-                println!("Subcommand: {:?}", &name);
-                println!("Subcommand matches: {:?}", &subcommand);
-            }
-        });
-        // if let Some(rr_cmds) = rr_cmds {
-        //     println!("{:?}", rr_cmds.subcommand_matches("list").unwrap());
-        // }
-        // println!("{:?}", rr_cmds.unwrap().subcommand_matches("list").unwrap());
-        
-        // let test_val = matches.subcommand_matches("releaseradar").clone();
-        // let rr_args = self.run_releaseradar(&matches).await;
-        // if let Some(testing_val) = Some(matches.get_one::<String>("ttest").unwrap_or(&"test".to_string()).to_string()) {
-        //     println!("Test flag: {:?}", &testing_val);
-        //     let testing = HashMapArgTypes::from_gen(test_val, testing_val);
-        //     println!("{:?}", testing);
-        // };
-        // let hashm = self.check_presence(&matches);
-        // println!("hashmap: {:?}", hashm);
-    }
-    async fn run_releaseradar(&self, matches: &ArgMatches) -> HashMap<&str, HashMapArgTypes> {
-        let rr_args = match matches.clone().subcommand_matches("releaseradar") {
-            Some(rr_arg_matches) => {
-                let mut hsh: HashMap<&str, HashMapArgTypes> = HashMap::new();
-                for arg_id in vec!["rrupdate", "rrlist", "rrcompare"].iter().copied() {
-                    match arg_id {
-                        "rrupdate" => {
-                            let presence = handle_rr!(rr_arg_matches, arg_id, bool, Bool);
-                            if presence == HashMapArgTypes::Bool(true) {
-                                let rr = ReleaseRadar::new().await;
-                                println!("Updating Release Radar playlist - {:?}", &presence);
-                                // rr.update_rr(true).await;
-                            }
-                            hsh.insert("update", presence);
-                        },
-                        // "rrlist" => {
-                        //     let presence = handle_rr!(rr_arg_matches, arg_id, String, String);
-                        //     if presence.variant_type() == "String" {
-                        //         println!("Listing release radar playlist tracks (default: custom) - {:?}", &presence);
-                        //     };
-                        //     hsh.insert("list", presence);
-                        // },
-                        "rrcompare" => {
-                            let presence = handle_rr!(rr_arg_matches, arg_id, String, String);
-                            // let presence = match rr_matches.get_one::<String>(val) {
-                            //     Some(&ref val) => HashMapArgTypes::String(val.to_string()),
-                            //     _ => HashMapArgTypes::Bool(false),
-                            // };
-                            if presence.variant_type() == "String" {
-                                println!("Comparing the Release Radar playlist to another playlist - {:?}", &presence);
-                            };
-                            // if get_type(&presence, true) == "HashMapArgTypes"{
-                            //     println!("Comparing the Release Radar playlist to another playlist - {:?}", &presence);
-                            // }
-                            hsh.insert("compare", presence);
-                        },
+                Some(subcommand) => {
+                    match name {
+                        "playlist" => {
+                            self.scan_playlist_command(&subcommand);
+                        }
+                        "config" => {
+                            self.scan_config_command(&subcommand);
+                        }
+                        "releaseradar" => {
+                            self.run_rr_command(&subcommand).await;
+                        }
                         _ => {}
                     }
+                    println!("Subcommand: {:?}", &name);
+                    println!("Subcommand matches: {:?}", &subcommand);
                 }
-                // vec!["update", "list", "compare"].iter().copied().for_each(|id| {
-                //     match id {
-                //         "update" => {
-                //
-                //             let presence = match rr_matches.get_one::<bool>(id) {
-                //                 Some(&val) => HashMapArgTypes::Bool(val),
-                //                 _ => HashMapArgTypes::Bool(false),
-                //             };
-                //             println!("Updating Release Radar playlist - {:?}", &presence);
-                //             let rr = ReleaseRadar::new();
-                //             // rr.update_rr(true);
-                //             hsh.insert("update", presence);
-                //         },
-                //         "list" => {
-                //             let presence = match rr_matches.get_one::<String>(id) {
-                //                 Some(&ref val) => HashMapArgTypes::String(val.to_string()),
-                //                 _ => HashMapArgTypes::Bool(false),
-                //             };
-                //             println!("Listing release radar playlist tracks (default: custom) - {:?}", &presence);
-                //             hsh.insert("list", presence);
-                //         },
-                //         "compare" => {
-                //             let presence = match rr_matches.get_one::<String>(id) {
-                //                 Some(&ref val) => HashMapArgTypes::String(val.to_string()),
-                //                 _ => HashMapArgTypes::Bool(false),
-                //             };
-                //             println!("Comparing the Release Radar playlist to another playlist - {:?}", &presence);
-                //             hsh.insert("compare", presence);
-                //         },
-                //         _ => {}
-                //     }
-                // });
-                hsh
             }
-            None => {
-                println!("The releaseradar subcommand was not used");
-                HashMap::new()
-            }
-        };
-        println!("Releaseradar Flags: {:?}\n", &rr_args);
-        rr_args
+        }).await;
     }
+    
     fn scan_playlist_command(&self, matches: &ArgMatches) {
         let plist = matches.get_one::<bool>("plist").unwrap_or(&false).to_string();
         let pcreate = matches.get_one::<bool>("pcreate").unwrap_or(&false).to_string();
@@ -247,36 +129,86 @@ impl TerminalApp {
         let pdelete = matches.get_one::<bool>("pdelete").unwrap_or(&false).to_string();
         println!("Playlist list: {:?}; Playlist create: {:?}; Playlist move: {:?}; Playlist delete: {:?}", &plist, &pcreate, &pmove, &pdelete);
     }
+    
     fn scan_config_command(&self, matches: &ArgMatches) {
+        if let Some(shell) = matches.get_one::<ShellType>("cshell") {
+            let mut cmd = self.command.clone();
+            generate_auto_complete!(shell, cmd);
+            return;
+        }
         let cset = matches.get_one::<String>("cset").unwrap_or(&"false".to_string()).to_string();
         let cunset = matches.get_one::<String>("cunset").unwrap_or(&"false".to_string()).to_string();
         let cget = matches.get_one::<String>("cget").unwrap_or(&"false".to_string()).to_string();
         let cshell = matches.get_one::<ShellType>("cshell").unwrap_or(&ShellType::Bash).to_string();
         println!("Config set: {:?}; Config unset: {:?}; Config get: {:?}; Config shell: {:?}", &cset, &cunset, &cget, &cshell);
     }
+    
+    async fn run_rr_command(&self, rr_subcommand: &ArgMatches) {
+        let rr = ReleaseRadar::new().await;
+        if let Some(list) = rr_subcommand.subcommand_matches("queryrr") {
+            let rl_spot = list.get_one::<bool>("rlspot").unwrap_or(&false).to_string();
+            let rl_custom = list.get_one::<bool>("rlcustom").unwrap_or(&false).to_string();
+            println!("Spotify flag: {:?}; Custom flag: {:?}", &rl_spot, &rl_custom);
+            if rl_spot == "true" {
+                rr.query_rr(false).await;
+            } else if rl_custom == "true" {
+                rr.query_rr(true).await;
+            }
+        }
+        if let Some(update) = rr_subcommand.subcommand_matches("updaterr") {
+            let print_rr = update.get_one::<bool>("printrr").unwrap_or(&false).to_string();
+            if print_rr == "true" {
+                rr.update_rr(true).await;
+            } else {
+                rr.update_rr(false).await;
+                println!("Your personal Release Radar has been updated.");
+            }
+        }
+        if let Some(compare) = rr_subcommand.subcommand_matches("comparerr") {
+            let rr_obj = rr.get_rr(true).await;
+            let comp_obj = ComparePlaylists::new(rr_obj).await;
+            if let Some(playlist) = compare.get_one::<String>("playlisttocompare") {
+                let test = PlaylistQuery::new().await;
+                if let Ok(queried_pl) = test.query_playlist(playlist.to_string()).await {
+                    let comp_obj_2 = ComparePlaylists::new(queried_pl).await;
+                    let comp_tracks = comp_obj.comp_tracks(&comp_obj_2);
+                    comp_obj.print_comp(comp_tracks);
+                }
+                println!("Comparing the Release Radar playlist to the {:?} playlist", &playlist);
+            }
+        }
+    }
+    
     fn config_command() -> Command {
         Command::new("config")
+            .short_flag('C')
+            .long_flag("config")
             .about("Configuration subcommand")
             .arg(
                 Arg::new("cset")
                     .help("Set a configuration value within config")
+                    .short('s')
                     .long("set")
                     .help("Set a configuration value within config"),
             )
             .arg(
                 Arg::new("cunset")
                     .help("Unset a configuration value within config")
+                    .short('u')
                     .long("unset")
                     .help("Unset a configuration value within config"),
             )
             .arg(
                 Arg::new("cget")
                     .help("Get a configuration value within config")
+                    .short('g')
                     .long("get")
                     .help("Get a configuration value within config"),
             )
             .arg(
                 Arg::new("cshell")
+                    .short('S')
+                    .long("shell")
                     .value_parser(value_parser!(ShellType))
                     .help("The shell to generate the script for"),
             )
@@ -286,6 +218,7 @@ impl TerminalApp {
                     .required(true),
             )
     }
+    
     fn playlist_command() -> Command {
         Command::new("playlist")
             .short_flag('p')
@@ -294,6 +227,10 @@ impl TerminalApp {
                 Arg::new("plist")
                     .short('l')
                     .long("list")
+                    .value_parser(BoolValueParser::new()
+                        .map(|b| if b { true } else { false })
+                    )
+                    .action(ArgAction::SetTrue)
                     .help("List all playlists"),
             )
             .arg(
@@ -316,6 +253,7 @@ impl TerminalApp {
                     .help("Delete a playlist"),
             )
     }
+    
     fn release_radar_command() -> Command {
         Command::new("releaseradar")
             .short_flag_alias('R')
@@ -360,14 +298,9 @@ impl TerminalApp {
                             |styling::Effects::BOLD)
                     )
                     .after_help("This command will list all songs in the specified Release Radar playlist"),
-                
-                // .value_parser(["spotify", "custom"])
-                // .default_missing_values(["custom"].into_iter())
-                // .value_name("STOCK | CUSTOM")
-                // .help("List all songs in the Release Radar playlist"),
             )
             .subcommand(
-                Command::new("rrupdate")
+                Command::new("updaterr")
                     .short_flag('U')
                     .long_flag("Update")
                     .color(ColorChoice::Always)
@@ -383,30 +316,48 @@ impl TerminalApp {
                             .help("Print the update progress"),
                     )
             )
-            .arg(
-                Arg::new("rrcompare")
-                    .short('c')
-                    .long("compare")
-                    .value_name("PLAYLIST-NAME")
-                    .help("Compare the Release Radar playlist to another playlist"),
+            .subcommand(
+                Command::new("comparerr")
+                    .short_flag('C')
+                    .long_flag("compare")
+                    .color(ColorChoice::Always)
+                    .about("Compare the Release Radar playlist to another playlist")
+                    .arg(
+                        Arg::new("playlisttocompare")
+                            .short('p')
+                            .long("playlist")
+                            .value_name("PLAYLIST-NAME")
+                            .help("The exact name of the playlist to use for comparison"),
+                    )
             )
+            // .arg(
+            //     Arg::new("rrcompare")
+            //         .short('c')
+            //         .long("compare")
+            //         .value_name("PLAYLIST-NAME")
+            //         .help("Compare the Release Radar playlist to another playlist"),
+            // )
     }
+    
+    #[allow(dead_code)]
     fn use_test_value(&self, matches: &ArgMatches) {
         let test_val = matches.get_one::<String>("ttest").unwrap_or(&"test".to_string()).to_string();
         println!("Test flag: {:?}", &test_val);
     }
+    
+    #[allow(dead_code)]
     fn check_presence(&self, matches: &ArgMatches) -> HashMap<&str, bool> {
-        let mut presence = HashMap::new();
+        let presence = HashMap::new();
         let args = Self::ARGS.to_vec();
         args.iter().for_each(|&id| {
-            let id_clone = id.clone().to_string();
+            let _id_clone = id.to_string();
             println!("{:?}: {:?} ", id, matches.contains_id(id));
-            // presence.insert(id_clone.as_str(), matches.contains_id(id.clone().to_string().as_str()));
         });
         presence
     }
-    fn check_subcommand_conflicts(&self, matches: &clap::ArgMatches) {
-        let subcommands = matches.subcommand_name();
+    
+    fn check_subcommand_conflicts(&self, matches: &ArgMatches) {
+        let _subcommands = matches.subcommand_name();
         let mut subcommand_count = 0;
         if matches.subcommand_matches("config").is_some() {
             subcommand_count += 1;
@@ -423,19 +374,24 @@ impl TerminalApp {
         }
     }
 }
+
 #[derive(Debug, PartialEq)]
+#[allow(dead_code)]
 enum HashMapArgTypes {
     String(String),
     Bool(bool),
 }
 
 impl HashMapArgTypes {
+    #[allow(dead_code)]
     pub fn variant_type(&self) -> &'static str {
         match self {
             HashMapArgTypes::String(_) => "String",
             HashMapArgTypes::Bool(_) => "Bool",
         }
     }
+    
+    #[allow(dead_code)]
     fn from_gen(arg_val: Option<&ArgMatches>, id: String) -> Self {
         match arg_val {
             None => {
