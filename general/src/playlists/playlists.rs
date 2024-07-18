@@ -1,4 +1,11 @@
+use dotenv::dotenv;
+use prettytable::{row, Table};
+use rspotify::{AuthCodeSpotify, scopes};
 use rspotify::model::FullPlaylist;
+
+// use crate::enums::playlists::PlaylistParam::String;
+use crate::models::tracks::StoredTracks;
+use crate::utils::client::setup;
 
 pub enum Playlist {
     ReleaseRadar(FullPlaylist),
@@ -11,39 +18,189 @@ pub enum Playlist {
     // Custom,
 }
 
-impl PlaylistActions for Playlist {
-    // fn replace_tracks(&self, track_ids: Vec<TrackId>) {
-    //     todo!()
-    // }
+// #[allow(dead_code)]
+// impl PlaylistActions for Playlist {
+//     // fn replace_tracks(&self, track_ids: Vec<TrackId>) {
+//     //     todo!()
+//     // }
+//
+//     // fn get_playlist_tracks(&self) {
+//     //     match self { Playlist::ReleaseRadar(playlist) => {playlist.clone().tracks.items} }
+//     //     todo!()
+//     // }
+// }
+// trait PlaylistActions {
+//     // fn add_tracks(&self, track_ids: Vec<TrackId>);
+//     // fn remove_tracks(&self, track_ids: Vec<TrackId>);
+//     // fn reorder_tracks(&self, track_ids: Vec<TrackId>);
+//     // fn replace_tracks(&self, track_ids: Vec<TrackId>);
+//     // fn get_playlist_tracks(&self) {
+//     //     self.clone().tracks.items
+//     // };
+//     // fn get_playlist_tracks_info(&self);
+//     // fn get_playlist_tracks_properties(&self);
+//     // fn get_playlist_tracks_audio_features(&self);
+//     // fn get_playlist_tracks_audio_analysis(&self);
+//
+//     // fn get_playlist(&self);
+//     // fn delete_playlist(&self);
+//     // fn create_playlist(&self);
+//     // fn upload_cover_image(&self);
+//     // fn get_playlist_cover_image(&self);
+//     // fn upload_playlist_cover_image(&self);
+//     // fn get_playlist_tracks_recommendations(&self);
+//     // fn get_playlist_tracks_recommendations_properties(&self);
+//     // fn get_playlist_tracks_recommendations_audio_features(&self);
+//     // fn get_playlist_tracks_recommendations_audio_analysis(&self);
+// }
 
-    // fn get_playlist_tracks(&self) {
-    //     match self { Playlist::ReleaseRadar(playlist) => {playlist.clone().tracks.items} }
-    //     todo!()
-    // }
+// #[derive(PartialEq)]
+#[allow(unused_macros)]
+macro_rules! zip_to_longest {
+    ($vectors:expr, $length:literal, $headers:expr, $default:expr) => {{
+        let longest_vector_len = $vectors.iter().map(|v| v.len()).max().unwrap_or(0);
+        let mut zipped = Vec::with_capacity(longest_vector_len);
+        zipped.push($headers);
+        // for i in 0..longest_vector_len {
+        //     let tuple = $vectors.into_iter().map(|v| {
+        //     // let tuple = $vectors.iter().map(|v| {
+        //         if i < v.len() {
+        //             v[i].clone()
+        //         } else {
+        //             $default.clone()
+        //         }
+        //     }).collect::<[String; $length]>();
+        //     // }).collect::<(String, String, String)>();
+        //     // }).collect::<Vec<String>>();
+        //     // let mut tuple = Vec::with_capacity($vectors.len());
+        //     // for v in &$vectors {
+        //     //     tuple.push(v.get(i).cloned());
+        //     // }
+        //     zipped.push(tuple);
+            for i in 0..longest_vector_len {
+            let tuple: (String, String, String) = $vectors.iter().map(|v| {
+                if i < v.len() {
+                    v[i].clone()
+                } else {
+                    $default.clone()
+                }
+            }).collect::<Vec<String>>().try_into().unwrap_or_else(|v: Vec<String>| {
+                panic!("Expected a Vec of length {} but it was {}", $length, v.len())
+            });
+            zipped.push(tuple);
+        }
+        zipped
+    }};
 }
-trait PlaylistActions {
-    // fn add_tracks(&self, track_ids: Vec<TrackId>);
-    // fn remove_tracks(&self, track_ids: Vec<TrackId>);
-    // fn reorder_tracks(&self, track_ids: Vec<TrackId>);
-    // fn replace_tracks(&self, track_ids: Vec<TrackId>);
-    // fn get_playlist_tracks(&self) {
-    //     self.clone().tracks.items
-    // };
-    // fn get_playlist_tracks_info(&self);
-    // fn get_playlist_tracks_properties(&self);
-    // fn get_playlist_tracks_audio_features(&self);
-    // fn get_playlist_tracks_audio_analysis(&self);
+#[allow(dead_code)]
+pub struct ComparePlaylists {
+    client: AuthCodeSpotify,
+    playlist: FullPlaylist,
+    pub stored_tracks: StoredTracks,
+}
 
-    // fn get_playlist(&self);
-    // fn delete_playlist(&self);
-    // fn create_playlist(&self);
-    // fn upload_cover_image(&self);
-    // fn get_playlist_cover_image(&self);
-    // fn upload_playlist_cover_image(&self);
-    // fn get_playlist_tracks_recommendations(&self);
-    // fn get_playlist_tracks_recommendations_properties(&self);
-    // fn get_playlist_tracks_recommendations_audio_features(&self);
-    // fn get_playlist_tracks_recommendations_audio_analysis(&self);
+impl PartialEq for ComparePlaylists {
+    fn eq(&self, other: &Self) -> bool {
+        let pl_ids = self.playlist.id == other.playlist.id;
+        pl_ids
+    }
+}
+#[allow(dead_code)]
+impl ComparePlaylists {
+    pub async fn new(playlist: FullPlaylist) -> Self {
+        dotenv().ok();
+        let scopes = scopes!(
+            "playlist-read-private",
+            "playlist-read-collaborative",
+            "playlist-modify-public",
+            "playlist-modify-private"
+        );
+        
+        ComparePlaylists {
+            client: setup(Some(scopes)).await,
+            playlist: playlist.clone(),
+            stored_tracks: StoredTracks::from_playlist(playlist.tracks.clone()),
+        }
+    }
+    pub fn eq_len(&self, other: &Self) -> bool {
+        println!("Playlist lengths are equal: {:?}", self.playlist.tracks.total == other.playlist.tracks.total);
+        println!("Playlist 1 length: {:?}", self.playlist.tracks.total);
+        println!("Playlist 2 length: {:?}", other.playlist.tracks.total);
+        self.playlist.tracks.total == other.playlist.tracks.total
+    }
+    pub fn comp_metadata(&self, other: &Self) -> bool {
+        let eq_id = self.playlist.id == other.playlist.id;
+        if eq_id {
+            println!("Playlists are equal.");
+            println!("Playlist ID: {:?}", self.playlist.id);
+            println!("Playlist name: {:?}", self.playlist.name);
+            println!("Playlist owner ID: {:?}", self.playlist.owner.id);
+        } else {
+            println!("Playlists are not equal.");
+            println!("Playlist 1 ID: {:?}", self.playlist.id);
+            println!("Playlist 2 ID: {:?}", other.playlist.id);
+            println!("Playlist 1 name: {:?}", self.playlist.name);
+            println!("Playlist 2 name: {:?}", other.playlist.name);
+            println!("Playlist 1 owner ID: {:?}", self.playlist.owner.id);
+            println!("Playlist 2 owner ID: {:?}", other.playlist.owner.id);
+        }
+        eq_id
+    }
+    // fn eq_
+    pub fn comp_tracks(&self, other: &Self) -> Vec<(String, String, String)> {
+        let self_ids = self.stored_tracks.tracks.clone().iter().map(|track| format!("{} -\n{:?}", track.name.clone(), track.artist_name.clone())).collect::<Vec<String>>();
+        let other_ids = other.stored_tracks.tracks.iter().map(|track| format!("{} -\n{:?}", track.name.clone(), track.artist_name.clone())).collect::<Vec<String>>();
+        let self_uniques = self_ids
+            .iter()
+            .filter(|&id| !other_ids.contains(id))
+            .cloned()
+            .enumerate()
+            .map(|(index, id)| format!("{index}. {id}"))
+            .collect::<Vec<String>>();
+        let other_uniques = other_ids
+            .iter()
+            .filter(|id| !self_ids.contains(id))
+            .cloned()
+            .enumerate()
+            .map(|(index, id)| format!("{index}. {id}"))
+            .collect::<Vec<String>>();
+        let shared = self_ids
+            .iter()
+            .filter(|id| other_ids.contains(id))
+            .cloned()
+            .enumerate()
+            .map(|(index, id)| format!("{index}. {id}"))
+            .collect::<Vec<String>>();
+        let heads = (format!("{} Unique Tracks", self.playlist.name.to_string()), "Shared Tracks".to_string(), format!("{} Unique Tracks", other.playlist.name.to_string()));
+        let final_vec = Self::combine_vectors(self_uniques, shared, other_uniques, heads, "".to_string());
+        final_vec
+    }
+    pub fn print_comp(&self, f: Vec<(String, String, String)>) {
+        let mut table = Table::new();
+        f.iter().for_each(|(self_uniques, shared, other_uniques)| {
+            if shared == "Shared Tracks" {
+                table.set_titles(row![FCbc => self_uniques, shared, other_uniques]);
+            } else {
+                table.add_row(row![self_uniques, shared, other_uniques]);
+            }
+        });
+        table.printstd();
+        // table.print_tty(true).expect("No table rendered");
+    }
+    fn combine_vectors<T: Clone>(v1: Vec<T>, v2: Vec<T>, v3: Vec<T>, headers: (T, T, T), default: T) -> Vec<(T, T, T)> {
+        let first_len = std::cmp::max(v1.len(), v2.len());
+        let len = std::cmp::max(first_len, v3.len());
+        let mut combined = Vec::with_capacity(len);
+        combined.push(headers);
+        
+        for i in 0..len {
+            let elem1 = v1.get(i).cloned().unwrap_or_else(|| default.clone());
+            let elem2 = v2.get(i).cloned().unwrap_or_else(|| default.clone());
+            let elem3 = v3.get(i).cloned().unwrap_or_else(|| default.clone());
+            combined.push((elem1, elem2, elem3));
+        }
+        combined
+    }
 }
 
 // REMOVED FROM UPDATE FILE - RELEASE RADAR STRUCT
