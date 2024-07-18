@@ -1,8 +1,6 @@
 use dotenv::dotenv;
-use futures_util::{SinkExt, TryStreamExt};
 use rspotify::clients::{BaseClient, OAuthClient};
-use rspotify::model::Country::UnitedStates;
-use rspotify::model::{AlbumId, Market, PlayableItem, PlaylistId, TrackId};
+use rspotify::model::{AlbumId, FullPlaylist, Market, PlayableItem, PlaylistId, TrackId};
 use rspotify::{prelude::*, scopes, AuthCodeSpotify};
 use std::borrow::Cow;
 use std::env;
@@ -51,6 +49,15 @@ impl ReleaseRadar {
             },
         };
         playlist_id
+    }
+    pub async fn get_rr(&self, rr_type: bool) -> FullPlaylist {
+        let pl_id = self.get_rr_id(rr_type);
+        let playlist = self
+            .client
+            .playlist(pl_id.clone(), None, Some(self.market))
+            .await
+            .unwrap();
+        return playlist;
     }
 
     pub async fn get_rr_track_album_ids(&self) -> Vec<AlbumId> {
@@ -149,13 +156,13 @@ impl ReleaseRadar {
 
     pub async fn update_rr(&self, print: bool) {
         let ids = self.get_album_tracks_from_rr(false).await;
-        let pl_id = PlaylistId::from_id(self.my_release_radar_id.id().clone()).unwrap();
+        let pl_id = PlaylistId::from_id(self.my_release_radar_id.id()).unwrap();
         let chunks = ids.chunks(20);
         let mut replace = true;
         for chunk in chunks {
             let chunk_iterated = chunk
                 .into_iter()
-                .map(|track| track.id().clone().to_string())
+                .map(|track| track.id().to_string())
                 .collect::<Vec<String>>();
 
             if replace {
@@ -214,6 +221,7 @@ impl ReleaseRadar {
 #[cfg(test)]
 #[cfg_attr(debug_assertions, allow(unused_variables, dead_code))]
 mod tests {
+    use rspotify::model::Country::UnitedStates;
     use super::*;
     use crate::utils::misc::get_type;
     use rspotify::model::Market;
