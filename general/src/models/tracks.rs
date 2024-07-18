@@ -1,8 +1,12 @@
+use std::fmt::Debug;
+
+// use anyhow::Debug;
 use rspotify::model::{AlbumId, FullTrack, Id, Page, PlayableItem, PlaylistItem};
 
 // use general::enums::tracks::TrackType;
 use crate::enums::tracks::TrackType;
 
+#[derive(Debug, Clone)]
 pub struct StoredTrack {
     pub name: String,
     pub id: String,
@@ -86,6 +90,7 @@ impl StoredTrack {
     }
 }
 
+#[derive(Debug)]
 pub struct StoredTracks {
     pub tracks: Vec<StoredTrack>,
 }
@@ -113,9 +118,9 @@ impl StoredTracks {
             TrackType::Tracks(mut tracks) => self.tracks.append(&mut tracks),
         }
     }
-    // fn add_single(&mut self, track: StoredTrack) {
-    //     self.tracks.push(track);
-    // }
+    pub fn add_single(&mut self, track: StoredTrack) {
+        self.tracks.push(track);
+    }
     // fn add_multiple(&mut self, mut tracks: Vec<StoredTrack>) {
     //     self.tracks.append(&mut tracks);
     // }
