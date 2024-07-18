@@ -20,14 +20,7 @@ pub enum Playlist {
 
 // #[allow(dead_code)]
 // impl PlaylistActions for Playlist {
-//     // fn replace_tracks(&self, track_ids: Vec<TrackId>) {
-//     //     todo!()
-//     // }
 //
-//     // fn get_playlist_tracks(&self) {
-//     //     match self { Playlist::ReleaseRadar(playlist) => {playlist.clone().tracks.items} }
-//     //     todo!()
-//     // }
 // }
 // trait PlaylistActions {
 //     // fn add_tracks(&self, track_ids: Vec<TrackId>);
