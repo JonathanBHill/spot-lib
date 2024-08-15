@@ -5,17 +5,18 @@ use rspotify::{prelude::*, scopes, AuthCodeSpotify};
 use std::borrow::Cow;
 use std::env;
 
-use crate::traits::utilities::Defaults;
+use crate::traits::utilities::SpotifyDefaults;
 use crate::utils::client::setup;
 use crate::utils::misc::print_separator;
 
+#[derive(Clone, Debug)]
 pub struct ReleaseRadar {
     pub client: AuthCodeSpotify,
     release_radar_id: PlaylistId<'static>,
     my_release_radar_id: PlaylistId<'static>,
     market: Market,
 }
-impl Defaults for ReleaseRadar {}
+impl SpotifyDefaults for ReleaseRadar {}
 impl ReleaseRadar {
     pub async fn new() -> Self {
         dotenv().ok();
@@ -34,7 +35,7 @@ impl ReleaseRadar {
                 env::var("MY_RELEASE_RADAR_ID").unwrap(),
             ))
             .unwrap(),
-            market: <ReleaseRadar as Defaults>::market(),
+            market: <ReleaseRadar as SpotifyDefaults>::market(),
         }
     }
     fn get_rr_id(&self, rr_type: bool) -> PlaylistId {
@@ -142,7 +143,18 @@ impl ReleaseRadar {
         };
         return return_vector;
     }
-
+    async fn change_description(&self) {
+        let pl_id = PlaylistId::from_id(self.my_release_radar_id.id()).unwrap();
+        let date = chrono::Local::now().format("%m/%d/%Y");
+        let description = format!(
+            "Release Radar playlist with songs from albums included. \
+            Created on 11/02/2023. Updated on {}.", date
+        );
+        self.client
+            .playlist_change_detail(pl_id, None, None, Some(&*description), None)
+            .await
+            .expect("Description should be assigned to description as type &str");
+    }
     fn append_uniques<'a>(existing: &Vec<TrackId<'a>>, new: &Vec<TrackId<'a>>) -> Vec<TrackId<'a>> {
         let mut extended = existing.clone();
         let intersection: Vec<_> = existing
@@ -153,7 +165,6 @@ impl ReleaseRadar {
         extended.extend(new.iter().filter(|x| !intersection.contains(x)).cloned());
         return extended;
     }
-
     pub async fn update_rr(&self, print: bool) {
         let ids = self.get_album_tracks_from_rr(false).await;
         let pl_id = PlaylistId::from_id(self.my_release_radar_id.id()).unwrap();
@@ -164,7 +175,6 @@ impl ReleaseRadar {
                 .into_iter()
                 .map(|track| track.id().to_string())
                 .collect::<Vec<String>>();
-
             if replace {
                 if print {
                     println!("Replacing playlist with the first {:?} tracks", chunk.len());
@@ -178,6 +188,7 @@ impl ReleaseRadar {
                     )
                     .await
                     .expect("Track IDs should be assigned to chunk_iterated as type TrackID");
+                self.change_description().await;
                 replace = false;
             } else {
                 if print {
@@ -196,7 +207,17 @@ impl ReleaseRadar {
             }
         }
     }
-    
+    pub async fn get_last_updated(&self) -> String {
+        let pl_id = PlaylistId::from_id(self.my_release_radar_id.id()).unwrap();
+        let playlist = self
+            .client
+            .playlist(pl_id.clone(), None, Some(self.market))
+            .await
+            .unwrap();
+        let description = playlist.description.unwrap_or("".to_string());
+        let last_updated_date = description.split("Updated on ").collect::<Vec<&str>>()[1];
+        format!("Last Updated on: {:?}", last_updated_date)
+    }
     fn print_all_album_track_ids(album_track_ids: &Vec<Vec<TrackId>>) {
         album_track_ids
             .iter()
