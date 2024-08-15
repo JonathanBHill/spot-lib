@@ -12,7 +12,7 @@ use crate::app::Spotui;
 pub fn ui<'a>(f: &mut Frame<'a>, app: &mut Spotui) -> eyre::Result<()> {
     // match app.current_screen {
     //     ScreenState::Main => {
-    //         app.current_screen.render(f, &mut app.open_screen, app.layout.split(f.size())[1]).await.expect("TODO: panic message");
+    //         app.current_screen.render(f, &mut app.open_screen, app.layout.split(f.size())[1]).await.expect("panic message");
     //         Ok(())
     //     },
     //     _ => Err(()),
