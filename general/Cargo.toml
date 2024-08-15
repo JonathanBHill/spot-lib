@@ -1,0 +1,26 @@
+[package]
+name = "spot-lib-general"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.86"
+chrono = "0.4.38"
+dotenv = "0.15.0"
+futures-util = "0.3.30"
+rspotify = { version = "0.13.2", default-features = false, features = ["cli", "client-reqwest", "reqwest-default-tls"] }
+term_size = "1.0.0-beta1"
+tokio = { version = "1.38.0", features = ["rt", "rt-multi-thread", "macros"] }
+prettytable-rs = "0.10.0"
+dialoguer = "0.11.0"
+regex = "1.10.5"
+directories = "5.0.1"
+color-eyre = "0.6.3"
+serde = "1.0.204"
+json5 = "0.4.1"
+
+#Spotify = { version = "0.1.0", path = "../../Spotify" }
+#[lib]
+#name = "general"
+#path = "src/lib.rs"
+#

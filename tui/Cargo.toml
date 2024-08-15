@@ -1,0 +1,22 @@
+[package]
+name = "spot-lib-tui"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ratatui = "0.27.1-alpha.2"
+color-eyre = "0.6.3"
+serde = { version = "1.0.204", features = ["derive"] }
+strum = "0.26.3"
+crossterm = { version = "0.27.0", features = ["event-stream"] }
+tokio = "1.38.1"
+lazy_static = "1.5.0"
+config = "0.14.0"
+derive_deref = "1.1.1"
+json5 = "0.4.1"
+directories = "5.0.1"
+tracing = "0.1.40"
+pretty_assertions = "1.4.0"
+anyhow = "1.0.86"
+spot-lib-general = { version = "0.1.0", path = "../general" }
+futures = "0.3.30"

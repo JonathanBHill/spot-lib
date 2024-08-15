@@ -1,0 +1,39 @@
+[package]
+name = "spot-lib"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+dotenv = "0.15.0"
+rspotify = { version = "0.13.2", default-features = false, features = ["cli", "client-reqwest", "reqwest-default-tls", "env-file"] }
+tokio = { version = "1.38.0", features = ["rt", "rt-multi-thread", "macros"] }
+futures-util = "0.3.30"
+anyhow = "1.0.86"
+chrono = "0.4.38"
+term_size = "1.0.0-beta1"
+ratatui = "0.27.1-alpha.2"
+crossterm = "0.27.0"
+spot-lib-general = { version = "0.1.0", path = "general" }
+spot-lib-cli = { version = "0.1.0", path = "cli" }
+spot-lib-tui = { version = "0.1.0", path = "tui" }
+directories = "5.0.1"
+
+
+[workspace]
+members = [ "cli", "general" , "tui"]
+
+#[lib]
+#name = "spot_lib_general"
+#path = "general/src/lib.rs"
+
+[[bin]]
+name = "spot_main"
+path = "src/main.rs"
+
+[[bin]]
+name = "release_radar"
+path = "src/bin/release_radar.rs"
+
+[[test]]
+name = "tests"
+path = "tests/integration_test.rs"
