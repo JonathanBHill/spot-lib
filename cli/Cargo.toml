@@ -1,0 +1,11 @@
+[package]
+name = "spot-lib-cli"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4.5.8", features = ["derive"] }
+clap_complete = "4.5.7"
+dialoguer = "0.11.0"
+spot-lib-general = { version = "0.1.0", path = "../general" }
+futures = "0.3.30"
