@@ -7,7 +7,7 @@ pub trait Printables {
     fn info(&self);
     fn item_properties(&self);
 }
-pub trait Defaults {
+pub trait SpotifyDefaults {
     fn market() -> Market {
         Market::Country(rspotify::model::Country::UnitedStates)
     }

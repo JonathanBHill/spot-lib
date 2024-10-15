@@ -2,10 +2,10 @@ use dotenv::dotenv;
 use rspotify::clients::{BaseClient, OAuthClient};
 use rspotify::model::{AlbumId, FullPlaylist, Market, PlayableItem, PlaylistId, TrackId};
 use rspotify::{prelude::*, scopes, AuthCodeSpotify};
-use std::borrow::Cow;
-use std::env;
+use crate::enums::playlists::PlaylistType;
+// use crate::traits::playlists::PlaylistBehavior;
 
-use crate::traits::utilities::Defaults;
+use crate::traits::utilities::SpotifyDefaults;
 use crate::utils::client::setup;
 use crate::utils::misc::print_separator;
 
@@ -15,8 +15,31 @@ pub struct ReleaseRadar {
     my_release_radar_id: PlaylistId<'static>,
     market: Market,
 }
-impl Defaults for ReleaseRadar {}
+impl SpotifyDefaults for ReleaseRadar {}
+// impl PlaylistBehavior for ReleaseRadar {
+//
+//     type ClientType = AuthCodeSpotify;
+//
+//     fn client(&self) -> &Self::ClientType {
+//         &self.client
+//     }
+//
+//     fn playlist_id(&self) -> &PlaylistId<'static> {
+//         &self.release_radar_id
+//     }
+//
+//     fn market(&self) -> Market {
+//         self.market
+//     }
+// }
 impl ReleaseRadar {
+    /// Creates a new `Release` instance.
+    ///
+    /// This function initializes the Spotify client with the necessary scopes and retrieves
+    /// the playlist IDs from environment variables.
+    ///
+    /// # Returns
+    /// A new `Release` instance.
     pub async fn new() -> Self {
         dotenv().ok();
         let scopes = scopes!(
@@ -28,30 +51,23 @@ impl ReleaseRadar {
 
         ReleaseRadar {
             client: setup(Some(scopes)).await,
-            release_radar_id: PlaylistId::from_id(Cow::from(env::var("RELEASE_RADAR_ID").unwrap()))
-                .unwrap(),
-            my_release_radar_id: PlaylistId::from_id(Cow::from(
-                env::var("MY_RELEASE_RADAR_ID").unwrap(),
-            ))
-            .unwrap(),
-            market: <ReleaseRadar as Defaults>::market(),
+            release_radar_id: PlaylistType::StockRR.get_id(),
+            my_release_radar_id: PlaylistType::MyRR.get_id(),
+            market: <ReleaseRadar as SpotifyDefaults>::market(),
         }
     }
-    fn get_rr_id(&self, rr_type: bool) -> PlaylistId {
-        let playlist_id = match rr_type {
-            true => match PlaylistId::from_id(self.my_release_radar_id.id()) {
-                Ok(id) => id,
-                Err(e) => panic!("Error: {:?}", e),
-            },
-            false => match PlaylistId::from_id(self.release_radar_id.id()) {
-                Ok(id) => id,
-                Err(e) => panic!("Error: {:?}", e),
-            },
-        };
-        playlist_id
-    }
+    /// Retrieves the last updated date of the user's Release Radar playlist.
+    ///
+    /// This function fetches the playlist details from Spotify and extracts the last updated
+    /// date from the playlist description.
+    ///
+    /// # Returns
+    /// A string representing the last updated date of the playlist.
     pub async fn get_rr(&self, rr_type: bool) -> FullPlaylist {
-        let pl_id = self.get_rr_id(rr_type);
+        let pl_id = match rr_type {
+            true => self.my_release_radar_id.clone(),
+            false => self.release_radar_id.clone(),
+        };
         let playlist = self
             .client
             .playlist(pl_id.clone(), None, Some(self.market))
@@ -59,10 +75,13 @@ impl ReleaseRadar {
             .unwrap();
         return playlist;
     }
-
+    /// Retrieves the album IDs of tracks in the Release Radar playlist.
+    ///
+    /// This function fetches the Release Radar playlist and extracts the album IDs of the tracks.
+    ///
+    /// # Returns
+    /// A vector of `AlbumId` representing the album IDs of the tracks in the Release Radar playlist.
     pub async fn get_rr_track_album_ids(&self) -> Vec<AlbumId> {
-        // let pl_id = PlaylistId::from_id(Cow::from(self.release_radar_id.clone())).unwrap();
-
         let playlist = self
             .client
             .playlist(self.release_radar_id.clone(), None, Some(self.market))
@@ -81,9 +100,19 @@ impl ReleaseRadar {
             .collect();
         return rr_track_album_ids;
     }
-
+    /// Queries the Release Radar playlist and prints track details.
+    ///
+    /// This function fetches the Release Radar playlist based on the `rr_type` and prints
+    /// the track name, album name, and artists for each track.
+    ///
+    /// # Arguments
+    /// * `rr_type` - A boolean indicating which Release Radar playlist to query.
+    ///               `true` for the user's Release Radar, `false` for the stock Release Radar.
     pub async fn query_rr(&self, rr_type: bool) {
-        let pl_id = self.get_rr_id(rr_type);
+        let pl_id = match rr_type {
+            true => self.my_release_radar_id.clone(),
+            false => self.release_radar_id.clone(),
+        };
         let playlist = self
             .client
             .playlist(pl_id.clone(), None, Some(self.market))
@@ -102,7 +131,16 @@ impl ReleaseRadar {
             }
         }
     }
-    // pub async fn get_album_tracks_from_rr(&self, print: bool) -> HashSet<TrackId> {
+    /// Retrieves the track IDs of all tracks in the albums from the Release Radar playlist.
+    ///
+    /// This function fetches the album IDs from the Release Radar playlist, retrieves the tracks
+    /// from each album, and returns a vector of unique track IDs. Optionally prints the track IDs.
+    ///
+    /// # Arguments
+    /// * `print` - A boolean indicating whether to print the track IDs.
+    ///
+    /// # Returns
+    /// A vector of `TrackId` representing the track IDs of all tracks in the albums from the Release Radar playlist.
     pub async fn get_album_tracks_from_rr(&self, print: bool) -> Vec<TrackId> {
         let album_ids = self.get_rr_track_album_ids().await;
         println!("Number of albums: {}", album_ids.len());
@@ -142,7 +180,17 @@ impl ReleaseRadar {
         };
         return return_vector;
     }
-
+    /// Appends unique track IDs from the new vector to the existing vector.
+    ///
+    /// This function takes two vectors of `TrackId` and appends only the unique track IDs
+    /// from the new vector to the existing vector.
+    ///
+    /// # Arguments
+    /// * `existing` - A vector of existing `TrackId`s.
+    /// * `new` - A vector of new `TrackId`s to be appended.
+    ///
+    /// # Returns
+    /// A vector of `TrackId` containing unique track IDs from both vectors.
     fn append_uniques<'a>(existing: &Vec<TrackId<'a>>, new: &Vec<TrackId<'a>>) -> Vec<TrackId<'a>> {
         let mut extended = existing.clone();
         let intersection: Vec<_> = existing
@@ -153,7 +201,13 @@ impl ReleaseRadar {
         extended.extend(new.iter().filter(|x| !intersection.contains(x)).cloned());
         return extended;
     }
-
+    /// Updates the Release Radar playlist with new tracks.
+    ///
+    /// This function fetches the track IDs from the albums in the Release Radar playlist,
+    /// and updates the playlist with these tracks. Optionally prints the track IDs.
+    ///
+    /// # Arguments
+    /// * `print` - A boolean indicating whether to print the track IDs.
     pub async fn update_rr(&self, print: bool) {
         let ids = self.get_album_tracks_from_rr(false).await;
         let pl_id = PlaylistId::from_id(self.my_release_radar_id.id()).unwrap();
@@ -197,6 +251,13 @@ impl ReleaseRadar {
         }
     }
     
+    /// Prints all album track IDs.
+    ///
+    /// This function takes a vector of vectors containing `TrackId`s and prints each track ID
+    /// along with its album and track index.
+    ///
+    /// # Arguments
+    /// * `album_track_ids` - A vector of vectors containing `TrackId`s.
     fn print_all_album_track_ids(album_track_ids: &Vec<Vec<TrackId>>) {
         album_track_ids
             .iter()
@@ -266,12 +327,12 @@ mod tests {
         assert_eq!(appended, c);
         println!("ReleaseRadar successfully appended only unique tracks.");
     }
-    #[tokio::test]
-    async fn test_get_rr_id() {
-        let rr = ReleaseRadar::new();
-        let await_rr = rr.await;
-        let rr_id = await_rr.get_rr_id(true);
-        assert_eq!(rr_id.id(), env::var("MY_RELEASE_RADAR_ID").unwrap());
-        println!("ReleaseRadar successfully retrieved the correct Release Radar ID.");
-    }
+    // #[tokio::test]
+    // async fn test_get_rr_id() {
+    //     let rr = ReleaseRadar::new();
+    //     let await_rr = rr.await;
+    //     let rr_id = await_rr.get_rr_id(true);
+    //     assert_eq!(rr_id.id(), env::var("MY_RELEASE_RADAR_ID").unwrap());
+    //     println!("ReleaseRadar successfully retrieved the correct Release Radar ID.");
+    // }
 }

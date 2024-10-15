@@ -5,7 +5,7 @@ use rspotify::{AuthCodeSpotify, scopes};
 use rspotify::model::{FullPlaylist, Id, PlaylistId, SearchResult, SearchType, SimplifiedPlaylist};
 use rspotify::prelude::BaseClient;
 
-use crate::traits::utilities::Defaults;
+use crate::traits::utilities::SpotifyDefaults;
 use crate::utils::client;
 use crate::utils::client::setup;
 
@@ -44,7 +44,7 @@ pub struct PlaylistQuery {
     pub client: AuthCodeSpotify,
 }
 
-impl Defaults for PlaylistQuery {}
+impl SpotifyDefaults for PlaylistQuery {}
 impl PlaylistQuery {
     pub async fn new() -> Self {
         let scope = scopes!(
@@ -75,7 +75,7 @@ impl PlaylistQuery {
         pattern
     }
     pub async fn query_playlist(&self, playlist_name: String) -> Result<FullPlaylist> {
-        let market = <PlaylistQuery as Defaults>::market();
+        let market = <PlaylistQuery as SpotifyDefaults>::market();
         let results = self.client.search(&playlist_name, SearchType::Playlist, Some(market), None, Some(50), None).await.unwrap();
         let pl_name_vec = playlist_name.split(" ").collect::<Vec<&str>>();
         let regex_pattern = self.construct_pattern(pl_name_vec);
